@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+use std::env;
 use std::io;
 
 use io::BufRead;
@@ -16,6 +18,9 @@ fn matrix_to_edges<'a>(labels: &[&'a str], matrix: &[Vec<i32>]) -> Vec<(&'a str,
 }
 
 fn main() -> io::Result<()> {
+    let args: Vec<String> = env::args().skip(1).collect();
+    let ascii = args.iter().any(|arg| arg == "--ascii");
+
     let stdin = io::stdin();
     let mut handle = stdin.lock();
     let mut label = String::new();
@@ -42,9 +47,59 @@ fn main() -> io::Result<()> {
     let edges = matrix_to_edges(&labels, &matrix);
     let stdout = io::stdout();
     let mut handle = stdout.lock();
-    handle.write_all(b"from,to,weight\n")?;
-    for (f, t, w) in edges.iter() {
-        handle.write_fmt(format_args!("{f},{t},{w}\n"))?;
+    if ascii {
+        let n = labels.len();
+        let size = ((n * 4) | 1).max(7);
+        let cx = size / 2;
+        let cy = size / 2;
+        let r = (size / 2 - 1) as f64;
+
+        let vertices: HashMap<&str, (usize, usize)> = (0..n)
+            .map(|i| {
+                let angle = 2.0 * std::f64::consts::PI * i as f64 / n as f64;
+                let x = (cx as f64 + r * angle.cos()) as usize;
+                let y = (cy as f64 + r * angle.sin()) as usize;
+                (labels[i], (x, y))
+            })
+            .collect();
+
+        let mut map: Vec<Vec<&str>> = vec![vec![" "; size]; size];
+
+        for &(f, t, _w) in &edges {
+            let (x0, y0) = vertices[f];
+            let (x1, y1) = vertices[t];
+            let dx = x1 as isize - x0 as isize;
+            let dy = y1 as isize - y0 as isize;
+            // This may produce fewer steps than needed, but for undirected graphs
+            // the reverse edge (B→A) will draw the same line with correct steps.
+            let steps = dx.max(dy);
+            for s in 1..steps {
+                let x = (x0 as isize + dx * s / steps) as usize;
+                let y = (y0 as isize + dy * s / steps) as usize;
+                map[y][x] = "*";
+            }
+        }
+
+        for (&k, &(x, y)) in vertices.iter() {
+            map[y][x] = k;
+        }
+
+        // ----   4 dash for a cell
+        // | X |
+        writeln!(handle, "{}", "-".repeat(4 * size))?;
+        for row in &map {
+            write!(handle, "|")?;
+            for &c in row {
+                write!(handle, " {} |", c)?;
+            }
+            writeln!(handle)?;
+            writeln!(handle, "{}", "-".repeat(4 * size))?;
+        }
+    } else {
+        handle.write_all(b"from,to,weight\n")?;
+        for (f, t, w) in edges.iter() {
+            handle.write_fmt(format_args!("{f},{t},{w}\n"))?;
+        }
     }
     handle.flush()?;
 
