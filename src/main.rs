@@ -1,3 +1,8 @@
+use std::io;
+
+use io::BufRead;
+use io::Write;
+
 fn matrix_to_edges<'a>(labels: &[&'a str], matrix: &[Vec<i32>]) -> Vec<(&'a str, &'a str, i32)> {
     let mut edges = Vec::with_capacity(matrix.len());
     for (i, row) in matrix.iter().enumerate() {
@@ -10,8 +15,40 @@ fn matrix_to_edges<'a>(labels: &[&'a str], matrix: &[Vec<i32>]) -> Vec<(&'a str,
     edges
 }
 
-fn main() {
-    println!("Hello, world!");
+fn main() -> io::Result<()> {
+    let stdin = io::stdin();
+    let mut handle = stdin.lock();
+    let mut label = String::new();
+    handle.read_line(&mut label)?;
+    let mut matrix = Vec::new();
+    for line in handle.lines() {
+        let line = line?;
+        let fields: Vec<&str> = line.split(',').skip(1).map(str::trim).collect();
+        let weights = fields
+            .iter()
+            .map(|f| {
+                f.parse::<i32>().map_err(|e| {
+                    io::Error::new(
+                        io::ErrorKind::InvalidData,
+                        format!("{e}: '{f}' in the line '{fields:?}'"),
+                    )
+                })
+            })
+            .collect::<io::Result<Vec<i32>>>()?;
+        matrix.push(weights);
+    }
+
+    let labels: Vec<&str> = label.split(',').skip(1).map(str::trim).collect();
+    let edges = matrix_to_edges(&labels, &matrix);
+    let stdout = io::stdout();
+    let mut handle = stdout.lock();
+    handle.write_all(b"from,to,weight\n")?;
+    for (f, t, w) in edges.iter() {
+        handle.write_fmt(format_args!("{f},{t},{w}\n"))?;
+    }
+    handle.flush()?;
+
+    Ok(())
 }
 
 #[rustfmt::skip]
