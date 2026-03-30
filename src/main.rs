@@ -19,7 +19,21 @@ fn matrix_to_edges<'a>(labels: &[&'a str], matrix: &[Vec<i32>]) -> Vec<(&'a str,
 
 fn main() -> io::Result<()> {
     let args: Vec<String> = env::args().skip(1).collect();
-    let ascii = args.iter().any(|arg| arg == "--ascii");
+
+    let mut ascii = false;
+    let mut ascii_style = "";
+    for i in 0..args.len() {
+        let arg = args[i].as_str();
+        match arg {
+            "--ascii" => {
+                ascii = true;
+                if i + 1 < args.len() {
+                    ascii_style = args[i + 1].as_str();
+                }
+            }
+            _ => continue,
+        };
+    }
 
     let stdin = io::stdin();
     let mut handle = stdin.lock();
@@ -84,16 +98,25 @@ fn main() -> io::Result<()> {
             map[y][x] = k;
         }
 
-        // ----   4 dash for a cell
-        // | X |
-        writeln!(handle, "{}", "-".repeat(4 * size))?;
-        for row in &map {
-            write!(handle, "|")?;
-            for &c in row {
-                write!(handle, " {} |", c)?;
-            }
-            writeln!(handle)?;
+        if ascii_style == "grid" {
+            // ----   4 dash for a cell
+            // | X |
             writeln!(handle, "{}", "-".repeat(4 * size))?;
+            for row in &map {
+                write!(handle, "|")?;
+                for &c in row {
+                    write!(handle, " {} |", c)?;
+                }
+                writeln!(handle)?;
+                writeln!(handle, "{}", "-".repeat(4 * size))?;
+            }
+        } else {
+            for row in &map {
+                for &c in row {
+                    write!(handle, " {} ", c)?;
+                }
+                writeln!(handle)?;
+            }
         }
     } else {
         handle.write_all(b"from,to,weight\n")?;
